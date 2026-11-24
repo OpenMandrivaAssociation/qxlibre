@@ -1,8 +1,11 @@
-# Qt minor this plugin is built for. QXLibre uses private Qt headers and the
-# QPA ABI, so it has to be rebuilt for every qt6-qtbase update. qt_next is
-# the first Qt version this build must not be installed with.
-%global qt_version 6.12.0
-%global qt_next 6.12.1
+# Qt patch release this plugin is built for. QXLibre uses private Qt headers
+# and the QPA ABI, so it has to be rebuilt for every qt6-qtbase update.
+# qt_next is the first Qt version this build must not be installed with.
+# upstream_version is the QXLibre tag. Upstream adds a fourth component for
+# its own fixes and accepts any patch release of that Qt minor.
+%global qt_version 6.12.1
+%global qt_next 6.12.2
+%global upstream_version 6.12.0.1
 
 Name:		qxlibre
 Version:	%{qt_version}
@@ -11,17 +14,21 @@ Summary:	Qt platform plugin for X11
 License:	(LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only) AND BSD-3-Clause
 Group:		System/Libraries
 URL:		https://github.com/X11Libre/QXLibre
-Source0:	%{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
-# Input-device lifetime fixes from main after the 6.12.0 tag:
-# do not delete devices the application registered itself, and do not
-# free an XI2 master's slave devices twice.
-Patch0:		qxlibre-6.12.0-input-device-lifetime.patch
+Source0:	%{url}/archive/refs/tags/%{upstream_version}.tar.gz#/%{name}-%{upstream_version}.tar.gz
+# qxcb fixes from Qt 6.12.1 that are not in the QXLibre 6.12.0.1 tag:
+# a fresh clipboard timestamp so a clipboard manager cannot keep the
+# selection, the ChildWindows capability, and the AT-SPI bus lookup.
+Patch0:		qxlibre-6.12.0.1-qt-6.12.1-qxcb.patch
 
 BuildRequires:	cmake
 BuildRequires:	ninja
 BuildRequires:	qt6-cmake
 BuildRequires:	cmake(Qt6CorePrivate)
 BuildRequires:	cmake(Qt6GuiPrivate)
+# Private headers move between Qt patch releases. Do not build this
+# against an older Qt than the one it will be installed with.
+BuildRequires:	pkgconfig(Qt6Core) >= %{qt_version}
+BuildRequires:	pkgconfig(Qt6Gui) >= %{qt_version}
 BuildRequires:	pkgconfig(egl)
 BuildRequires:	pkgconfig(glx)
 BuildRequires:	pkgconfig(glib-2.0)
@@ -61,8 +68,9 @@ Requires:	%{mklibname Qt6Gui} < %{qt_next}
 
 %description
 QXLibre is a Qt platform plugin for X11, forked from the xcb plugin in
-Qt 6.12 and developed for the XLibre X server. It also runs on any other
-X server, and it can serve Qt builds that have no X11 support of their own.
+Qt 6.12 and developed for the XLibre X server. It includes the xcb fixes
+from Qt %{qt_version}. It runs on any other X server, and it can serve Qt
+builds that have no X11 support of their own.
 
 The plugin installs beside Qt's own xcb plugin. For an X11 session, select
 it with QT_QPA_PLATFORM='xlibre;xcb' (xcb is the fallback when this plugin
@@ -94,7 +102,7 @@ Headers, CMake config and qmake files for the QXLibre Qt platform plugin.
 The module is private to the plugin.
 
 %prep
-%autosetup -n QXLibre-%{version} -p1
+%autosetup -n QXLibre-%{upstream_version} -p1
 
 %build
 %set_build_flags

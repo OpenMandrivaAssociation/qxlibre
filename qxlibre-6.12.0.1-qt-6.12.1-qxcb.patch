@@ -1,0 +1,50 @@
+From: OpenMandriva <bero@lindev.ch>
+Subject: [PATCH] Bring in the Qt 6.12.1 qxcb fixes
+
+QXLibre 6.12.0.1 is the Qt 6.12.0 xcb plugin plus QXLibre's own changes.
+These three fixes landed in Qt's xcb plugin for 6.12.1 and apply unchanged:
+
+* QXcbClipboard::setMimeData: always take a fresh timestamp, so a clipboard
+  manager that grabs the selection in between clear() and copy() cannot
+  leave Qt with a timestamp the X server rejects. QTBUG-108346,
+  qtbase c24f133d4d34.
+* Report QPlatformIntegration::ChildWindows. Qt 6.12.1 added the capability
+  and xcb supports native child windows. qtbase f93b7adb0701.
+* atspiBus() must use QXcbIntegration::instance(), same as the other
+  native-interface entry points. The static cast of the application platform
+  plugin is wrong when xcb is not that plugin. qtbase 25d0dd8f8b09.
+
+--- a/src/plugins/platforms/xcb/qxcbclipboard.cpp	2026-11-20 13:57:57.000000000 +0100
++++ b/src/plugins/platforms/xcb/qxcbclipboard.cpp	2026-11-24 06:02:43.875566226 +0100
+@@ -323,8 +323,8 @@
+         m_timestamp[mode] = XCB_CURRENT_TIME;
+     }
+ 
+-    if (connection()->time() == XCB_CURRENT_TIME)
+-        connection()->setTime(connection()->getTimestamp());
++    // fresh timestamp in case a clipboard manager takes over the selection with a newer time
++    connection()->setTime(connection()->getTimestamp());
+ 
+     if (data) {
+         newOwner = connection()->qtSelectionOwner();
+--- a/src/plugins/platforms/xcb/qxcbintegration.cpp	2026-11-20 13:57:57.000000000 +0100
++++ b/src/plugins/platforms/xcb/qxcbintegration.cpp	2026-11-24 06:02:43.875714399 +0100
+@@ -294,6 +294,7 @@
+     case WindowMasks:
+     case MultipleWindows:
+     case ForeignWindows:
++    case ChildWindows:
+     case SyncState:
+     case MouseCursorPositioning:
+         return true;
+--- a/src/plugins/platforms/xcb/qxcbnativeinterface.cpp	2026-11-20 13:57:57.000000000 +0100
++++ b/src/plugins/platforms/xcb/qxcbnativeinterface.cpp	2026-11-24 06:02:43.875839312 +0100
+@@ -350,7 +350,7 @@
+ 
+ void *QXcbNativeInterface::atspiBus()
+ {
+-    QXcbIntegration *integration = static_cast<QXcbIntegration *>(QGuiApplicationPrivate::platformIntegration());
++    QXcbIntegration *integration = QXcbIntegration::instance();
+     QXcbConnection *connection = integration->connection();
+     if (connection) {
+         auto atspiBusAtom = connection->atom(QXcbAtom::AtomAT_SPI_BUS);
